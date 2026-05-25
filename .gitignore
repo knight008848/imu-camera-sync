@@ -16,6 +16,9 @@ venv/
 # Data (raw input files, recordings, etc.)
 data/
 
+# Claude
+CLAUDE.md
+
 # OS
 .DS_Store
 Thumbs.db
