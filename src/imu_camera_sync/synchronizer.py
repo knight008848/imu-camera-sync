@@ -1,7 +1,10 @@
 """Time synchronization: interpolation, nearest-neighbor, resampling."""
 
+import numpy as np
+from scipy import interpolate
 
-def align(imu_data: dict, camera_data: dict, method: str = "nearest"):
+
+def align(imu_data: dict, camera_data: dict, method: str = "nearest") -> dict:
     """
     Align IMU and camera data to a common timeline.
 
@@ -11,6 +14,57 @@ def align(imu_data: dict, camera_data: dict, method: str = "nearest"):
         'nearest' — nearest-neighbor matching
         'interp'  — linear interpolation
 
-    Returns aligned data dict.
+    Returns aligned data dict with keys:
+    - timestamps: shared camera timestamps
+    - accel_aligned: Nx3 array
+    - gyro_aligned: Nx3 array
+    - imu_indices: indices into the original IMU data
     """
-    raise NotImplementedError
+    imu_ts = imu_data["timestamps"]
+    cam_ts = camera_data["timestamps"]
+
+    if method == "nearest":
+        return _align_nearest(imu_data, imu_ts, cam_ts)
+    elif method == "interp":
+        return _align_interp(imu_data, imu_ts, cam_ts)
+    else:
+        raise ValueError(f"Unknown alignment method: {method}")
+
+
+def _align_nearest(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> dict:
+    idx = np.searchsorted(imu_ts, cam_ts)
+    idx = np.clip(idx, 1, len(imu_ts) - 1)
+
+    left_diff = np.abs(imu_ts[idx - 1] - cam_ts)
+    right_diff = np.abs(imu_ts[idx] - cam_ts)
+    nearest_idx = np.where(left_diff <= right_diff, idx - 1, idx)
+
+    return {
+        "timestamps": cam_ts.copy(),
+        "accel_aligned": imu_data["accel"][nearest_idx],
+        "gyro_aligned": imu_data["gyro"][nearest_idx],
+        "imu_indices": nearest_idx,
+    }
+
+
+def _align_interp(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> dict:
+    # Only interpolate within IMU timestamp range
+    mask = (cam_ts >= imu_ts[0]) & (cam_ts <= imu_ts[-1])
+    valid_cam_ts = cam_ts[mask]
+
+    accel_interp = interpolate.interp1d(
+        imu_ts, imu_data["accel"], axis=0, kind="linear",
+        fill_value="extrapolate",
+    )(cam_ts)
+
+    gyro_interp = interpolate.interp1d(
+        imu_ts, imu_data["gyro"], axis=0, kind="linear",
+        fill_value="extrapolate",
+    )(cam_ts)
+
+    return {
+        "timestamps": cam_ts.copy(),
+        "accel_aligned": accel_interp,
+        "gyro_aligned": gyro_interp,
+        "imu_indices": None,
+    }
