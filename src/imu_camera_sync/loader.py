@@ -55,18 +55,34 @@ def load_camera(path: str | Path, odometry_path: str | Path | None = None):
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
 
+    if np.isnan(fps) or fps <= 0:
+        raise ValueError(f"Invalid video FPS: {fps}. File may be corrupted.")
+    if frame_count <= 0:
+        raise ValueError(f"Invalid frame count: {frame_count}. File may be empty or corrupted.")
+
     if odometry_path is not None:
         odom = pd.read_csv(odometry_path)
         odom.columns = [c.strip() for c in odom.columns]
+
+        if "timestamp" not in odom.columns:
+            raise ValueError(
+                f"Odometry CSV must contain a 'timestamp' column. "
+                f"Found: {list(odom.columns)}"
+            )
+
         odom_ts = odom["timestamp"].to_numpy(dtype=np.float64)
 
         if len(odom_ts) < frame_count:
-            # Pad with extrapolated timestamps
+            if len(odom_ts) <= 1:
+                raise ValueError(
+                    f"Odometry has {len(odom_ts)} timestamp(s), "
+                    f"need at least 2 to extrapolate for {frame_count} frames."
+                )
             expected_interval = np.median(np.diff(odom_ts))
-            extra = np.arange(len(odom_ts), frame_count)
+            n_pad = frame_count - len(odom_ts)
             odom_ts = np.concatenate([
                 odom_ts,
-                odom_ts[-1] + (extra - len(odom_ts) + 1) * expected_interval,
+                odom_ts[-1] + np.arange(1, n_pad + 1) * expected_interval,
             ])
         timestamps = odom_ts[:frame_count]
     else:

@@ -1,7 +1,9 @@
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
+import pytest
 
 from imu_camera_sync import loader
 
@@ -28,7 +30,6 @@ def test_load_imu():
 
 
 def test_load_camera_synthetic_ts():
-    # Create a minimal 2-frame mp4 with OpenCV
     import cv2
 
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
@@ -49,3 +50,97 @@ def test_load_camera_synthetic_ts():
         np.testing.assert_almost_equal(data["timestamps"][1] - data["timestamps"][0], 1 / 30.0)
     finally:
         Path(tmp_path).unlink()
+
+
+# ── boundary / error-path tests ──────────────────────────────────────────
+
+
+def _mock_capture(fps: float, frame_count: int):
+    """Return a mock that behaves like an opened VideoCapture with given props."""
+
+    def _get(prop):
+        import cv2
+
+        if prop == cv2.CAP_PROP_FPS:
+            return fps
+        if prop == cv2.CAP_PROP_FRAME_COUNT:
+            return float(frame_count)
+        return 0.0
+
+    return mock.MagicMock(isOpened=mock.MagicMock(return_value=True), get=_get)
+
+
+def test_load_camera_fps_zero():
+    with mock.patch("imu_camera_sync.loader.cv2.VideoCapture") as vc:
+        vc.return_value = _mock_capture(0.0, 100)
+        with pytest.raises(ValueError, match="FPS"):
+            loader.load_camera("fake.mp4")
+
+
+def test_load_camera_fps_negative():
+    with mock.patch("imu_camera_sync.loader.cv2.VideoCapture") as vc:
+        vc.return_value = _mock_capture(-1.0, 100)
+        with pytest.raises(ValueError, match="FPS"):
+            loader.load_camera("fake.mp4")
+
+
+def test_load_camera_fps_nan():
+    with mock.patch("imu_camera_sync.loader.cv2.VideoCapture") as vc:
+        vc.return_value = _mock_capture(float("nan"), 100)
+        with pytest.raises(ValueError, match="FPS"):
+            loader.load_camera("fake.mp4")
+
+
+def test_load_camera_frame_count_zero():
+    with mock.patch("imu_camera_sync.loader.cv2.VideoCapture") as vc:
+        vc.return_value = _mock_capture(30.0, 0)
+        with pytest.raises(ValueError, match="frame count"):
+            loader.load_camera("fake.mp4")
+
+
+def test_load_camera_odometry_missing_timestamp_col():
+    import cv2
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as vf:
+        video_path = vf.name
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as of:
+        of.write("frame,x,y,z\n0,1,2,3\n1,4,5,6\n")
+        odom_path = of.name
+
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(video_path, fourcc, 30.0, (64, 64))
+        writer.write(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
+        writer.write(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
+        writer.release()
+
+        with pytest.raises(ValueError, match="timestamp"):
+            loader.load_camera(video_path, odometry_path=odom_path)
+    finally:
+        Path(video_path).unlink()
+        Path(odom_path).unlink()
+
+
+def test_load_camera_odometry_single_row():
+    import cv2
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as vf:
+        video_path = vf.name
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as of:
+        of.write("timestamp,x,y,z\n0.0,1,2,3\n")
+        odom_path = of.name
+
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(video_path, fourcc, 30.0, (64, 64))
+        for _ in range(5):
+            writer.write(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
+        writer.release()
+
+        with pytest.raises(ValueError, match="need at least 2"):
+            loader.load_camera(video_path, odometry_path=odom_path)
+    finally:
+        Path(video_path).unlink()
+        Path(odom_path).unlink()
