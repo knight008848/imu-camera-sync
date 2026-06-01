@@ -29,6 +29,42 @@ def test_load_imu():
         Path(tmp_path).unlink()
 
 
+def test_load_imu_missing_timestamp_col():
+    csv_content = "time, a_x, a_y, a_z, alpha_x, alpha_y, alpha_z\n0.0,0.1,0.2,0.3,0.01,0.02,0.03\n"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write(csv_content)
+        tmp_path = f.name
+    try:
+        with pytest.raises(ValueError, match="timestamp"):
+            loader.load_imu(tmp_path)
+    finally:
+        Path(tmp_path).unlink()
+
+
+def test_load_imu_missing_accel_col():
+    csv_content = "timestamp, a_x, a_z, alpha_x, alpha_y, alpha_z\n0.0,0.1,0.2,0.01,0.02,0.03\n"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write(csv_content)
+        tmp_path = f.name
+    try:
+        with pytest.raises(ValueError, match="a_y"):
+            loader.load_imu(tmp_path)
+    finally:
+        Path(tmp_path).unlink()
+
+
+def test_load_imu_missing_gyro_col():
+    csv_content = "timestamp, a_x, a_y, a_z, alpha_x, alpha_z\n0.0,0.1,0.2,0.3,0.01,0.02\n"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write(csv_content)
+        tmp_path = f.name
+    try:
+        with pytest.raises(ValueError, match="alpha_y"):
+            loader.load_imu(tmp_path)
+    finally:
+        Path(tmp_path).unlink()
+
+
 def test_load_camera_synthetic_ts():
     import cv2
 

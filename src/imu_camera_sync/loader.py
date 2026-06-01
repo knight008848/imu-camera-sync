@@ -19,6 +19,18 @@ def load_imu(path: str | Path):
     df = pd.read_csv(path)
     df.columns = [c.strip() for c in df.columns]
 
+    required = [
+        "timestamp",
+        "a_x", "a_y", "a_z",
+        "alpha_x", "alpha_y", "alpha_z",
+    ]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(
+            f"IMU CSV is missing required columns: {missing}. "
+            f"Found: {list(df.columns)}"
+        )
+
     timestamps = df["timestamp"].to_numpy(dtype=np.float64)
 
     accel = df[["a_x", "a_y", "a_z"]].to_numpy(dtype=np.float64)
