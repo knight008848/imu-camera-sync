@@ -1,5 +1,7 @@
 """Data loading: IMU (CSV) and Camera (video/image sequences)."""
 
+import json
+import subprocess
 from pathlib import Path
 
 import cv2
@@ -72,6 +74,8 @@ def load_camera(path: str | Path, odometry_path: str | Path | None = None):
     if frame_count <= 0:
         raise ValueError(f"Invalid frame count: {frame_count}. File may be empty or corrupted.")
 
+    creation_utc = None
+
     if odometry_path is not None:
         odom = pd.read_csv(odometry_path)
         odom.columns = [c.strip() for c in odom.columns]
@@ -98,10 +102,37 @@ def load_camera(path: str | Path, odometry_path: str | Path | None = None):
             ])
         timestamps = odom_ts[:frame_count]
     else:
-        timestamps = np.arange(frame_count, dtype=np.float64) / fps
+        creation_utc = _extract_creation_time(path)
+        if creation_utc is not None:
+            timestamps = creation_utc + np.arange(frame_count, dtype=np.float64) / fps
+        else:
+            timestamps = np.arange(frame_count, dtype=np.float64) / fps
 
     return {
         "timestamps": timestamps,
         "fps": fps,
         "frame_count": frame_count,
+        "creation_utc": creation_utc,
     }
+
+
+def _extract_creation_time(path: str | Path) -> float | None:
+    """Extract MP4 creation_time as a Unix timestamp via ffprobe.
+
+    Returns None if ffprobe is unavailable or the tag is missing.
+    """
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json",
+             "-show_format", str(path)],
+            capture_output=True, text=True, timeout=10,
+        )
+        info = json.loads(result.stdout)
+        creation_str = info["format"]["tags"]["creation_time"]
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(creation_str.replace("Z", "+00:00"))
+        return dt.timestamp()
+    except (FileNotFoundError, KeyError, json.JSONDecodeError,
+            subprocess.TimeoutExpired, ValueError):
+        return None

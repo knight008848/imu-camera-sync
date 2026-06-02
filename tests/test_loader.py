@@ -83,7 +83,35 @@ def test_load_camera_synthetic_ts():
         assert data["frame_count"] == 5
         assert data["fps"] == 30.0
         assert data["timestamps"].shape == (5,)
+        assert data["creation_utc"] is None  # temp file has no creation_time
         np.testing.assert_almost_equal(data["timestamps"][1] - data["timestamps"][0], 1 / 30.0)
+    finally:
+        Path(tmp_path).unlink()
+
+
+def test_load_camera_with_creation_time():
+    """When MP4 has creation_time, timestamps should be UTC-based."""
+    import cv2
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f:
+        tmp_path = f.name
+
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(tmp_path, fourcc, 30.0, (64, 64))
+        for _ in range(3):
+            writer.write(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
+        writer.release()
+
+        # Pretend ffprobe found a creation_time
+        utc = 1779776250.0
+        with mock.patch.object(loader, "_extract_creation_time", return_value=utc):
+            data = loader.load_camera(tmp_path)
+
+        assert data["creation_utc"] == utc
+        assert data["timestamps"][0] == utc  # first frame at creation_time
+        assert data["timestamps"][1] == pytest.approx(utc + 1 / 30.0)
+        assert data["timestamps"][-1] == pytest.approx(utc + 2 / 30.0)
     finally:
         Path(tmp_path).unlink()
 
