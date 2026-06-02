@@ -8,6 +8,10 @@ def align(imu_data: dict, camera_data: dict, method: str = "nearest") -> dict:
     """
     Align IMU and camera data to a common timeline.
 
+    Both data dicts must share the same time base — e.g. both in device
+    uptime seconds (from odometry) or both in UTC seconds (converted via
+    ``creation_utc`` from the loader).
+
     Parameters
     ----------
     method : str
@@ -48,18 +52,16 @@ def _align_nearest(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> di
 
 
 def _align_interp(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> dict:
-    # Only interpolate within IMU timestamp range
-    mask = (cam_ts >= imu_ts[0]) & (cam_ts <= imu_ts[-1])
-    valid_cam_ts = cam_ts[mask]
-
     accel_interp = interpolate.interp1d(
         imu_ts, imu_data["accel"], axis=0, kind="linear",
-        fill_value="extrapolate",
+        bounds_error=False,
+        fill_value=(imu_data["accel"][0], imu_data["accel"][-1]),
     )(cam_ts)
 
     gyro_interp = interpolate.interp1d(
         imu_ts, imu_data["gyro"], axis=0, kind="linear",
-        fill_value="extrapolate",
+        bounds_error=False,
+        fill_value=(imu_data["gyro"][0], imu_data["gyro"][-1]),
     )(cam_ts)
 
     return {
