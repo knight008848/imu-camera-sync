@@ -8,7 +8,8 @@ def clean_imu(imu_data: dict) -> dict:
     """
     Clean IMU data: remove outliers, fill gaps, validate timestamps.
 
-    Returns cleaned data in the same format.
+    Returns cleaned data with a ``timestamp_jumps`` key: list of
+    (index, prev_ts, curr_ts, delta_s) for each backward jump > 1e-4 s.
     """
     ts = imu_data["timestamps"].copy()
     accel = imu_data["accel"].copy()
@@ -16,38 +17,48 @@ def clean_imu(imu_data: dict) -> dict:
 
     accel = _clean_signal(accel)
     gyro = _clean_signal(gyro)
-    ts = _repair_timestamps(ts)
+    ts, timestamp_jumps = _repair_timestamps(ts)
 
-    return {"timestamps": ts, "accel": accel, "gyro": gyro}
+    return {
+        "timestamps": ts,
+        "accel": accel,
+        "gyro": gyro,
+        "timestamp_jumps": timestamp_jumps,
+    }
 
 
 def clean_camera(camera_data: dict) -> dict:
     """
     Clean camera data: validate frame timestamps, detect dropped frames.
 
-    Returns cleaned data in the same format.
+    Returns cleaned data with a ``dropped_gaps`` key: list of
+    (frame_index, interval_s, expected_s, delta_s) for each gap.
     """
     ts = camera_data["timestamps"].copy()
     intervals = np.diff(ts)
     expected = np.median(intervals)
     gaps = intervals > 1.5 * expected
 
+    dropped_gaps = []
     if np.any(gaps):
-        gap_indices = np.where(gaps)[0]
-        for i in gap_indices:
-            delta = intervals[i] - expected
-            print(f"[clean_camera] dropped-frame gap at frame {i}: "
-                  f"interval={intervals[i]:.6f}s (expected ~{expected:.6f}s, delta={delta:.6f}s)")
+        for i in np.where(gaps)[0]:
+            dropped_gaps.append((int(i), float(intervals[i]), float(expected),
+                                 float(intervals[i] - expected)))
 
     return {
         "timestamps": ts,
         "fps": camera_data["fps"],
         "frame_count": camera_data["frame_count"],
+        "dropped_gaps": dropped_gaps,
     }
 
 
 def _clean_signal(data: np.ndarray) -> np.ndarray:
-    """Detect and interpolate outliers using median absolute deviation."""
+    """Detect and interpolate outliers using median absolute deviation.
+
+    Outliers at the edges are clamped to the nearest inlier value
+    instead of being linearly extrapolated, which can produce extreme results.
+    """
     cleaned = data.copy()
     n, n_axes = data.shape
 
@@ -64,16 +75,28 @@ def _clean_signal(data: np.ndarray) -> np.ndarray:
             inliers = ~outliers
             x_in = np.arange(n)[inliers]
             y_in = col[inliers]
-            f = interpolate.interp1d(x_in, y_in, kind="linear", fill_value="extrapolate")
+            f = interpolate.interp1d(
+                x_in, y_in, kind="linear",
+                bounds_error=False,
+                fill_value=(float(y_in[0]), float(y_in[-1])),
+            )
             cleaned[outliers, axis] = f(np.arange(n)[outliers])
 
     return cleaned
 
 
-def _repair_timestamps(ts: np.ndarray) -> np.ndarray:
-    """Ensure timestamps are strictly monotonic and non-negative delta."""
+def _repair_timestamps(ts: np.ndarray) -> tuple[np.ndarray, list]:
+    """Ensure timestamps are strictly monotonic and non-negative delta.
+
+    Backward jumps larger than 1e-4 s are recorded in the returned list
+    as (index, prev_ts, curr_ts, delta_s).
+    """
     repaired = ts.copy()
+    jumps = []
     for i in range(1, len(repaired)):
-        if repaired[i] <= repaired[i - 1]:
+        delta = repaired[i] - repaired[i - 1]
+        if delta < -1e-4:
+            jumps.append((i, float(repaired[i - 1]), float(repaired[i]), float(delta)))
+        if delta <= 0:
             repaired[i] = repaired[i - 1] + 1e-9
-    return repaired
+    return repaired, jumps
