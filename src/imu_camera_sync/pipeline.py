@@ -14,7 +14,7 @@ def process_session(
     session_dir: str,
     method: str = "nearest",
     with_visualization: bool = False,
-    max_tolerance: float = 0.05,
+    max_tolerance_s: float = 0.05,
 ) -> dict:
     """Run the full pipeline on a single session directory.
 
@@ -23,8 +23,8 @@ def process_session(
 
     Parameters
     ----------
-    max_tolerance : float
-        Max allowed time difference (seconds) for nearest-neighbor matching.
+    max_tolerance_s : float
+        Max allowed time difference in seconds for nearest-neighbor matching.
         Frames exceeding this are dropped. Default 0.05 s (50 ms).
 
     Returns a quality-metrics dict with keys:
@@ -50,26 +50,26 @@ def process_session(
         camera_raw = loader.load_camera(camera_path, odometry_path=odometry_path)
 
         # ── imu stats ──
-        imu_intervals = np.diff(imu_raw["timestamps"]) * 1000
-        result["imu"] = _stats_imu(imu_raw, imu_intervals)
+        imu_intervals_ms = np.diff(imu_raw["timestamps"]) * 1000
+        result["imu"] = _stats_imu(imu_raw, imu_intervals_ms)
 
         # ── camera stats ──
-        cam_intervals = np.diff(camera_raw["timestamps"]) * 1000
-        expected_ms = 1000.0 / camera_raw["fps"]
-        gap_count = int(np.sum(cam_intervals > expected_ms * 1.5))
+        cam_intervals_ms = np.diff(camera_raw["timestamps"]) * 1000
+        expected_interval_ms = 1000.0 / camera_raw["fps"]
+        gap_count = int(np.sum(cam_intervals_ms > expected_interval_ms * 1.5))
         result["camera"] = {
             "frames": camera_raw["frame_count"],
             "duration_s": float(camera_raw["timestamps"][-1] - camera_raw["timestamps"][0]),
             "fps": camera_raw["fps"],
             "gap_count": gap_count,
-            "interval_std_ms": float(np.std(cam_intervals)),
+            "interval_std_ms": float(np.std(cam_intervals_ms)),
         }
 
         # ── clean & align ──
         imu_clean = cleaner.clean_imu(imu_raw)
         camera_clean = cleaner.clean_camera(camera_raw)
         synced = synchronizer.align(
-            imu_clean, camera_clean, method=method, max_tolerance=max_tolerance
+            imu_clean, camera_clean, method=method, max_tolerance_s=max_tolerance_s
         )
 
         # ── alignment stats ──
@@ -96,7 +96,7 @@ def batch_process(
     data_root: str = "data",
     method: str = "nearest",
     with_visualization: bool = False,
-    max_tolerance: float = 0.05,
+    max_tolerance_s: float = 0.05,
 ) -> list[dict]:
     """Process every session directory under ``data_root``.
 
@@ -114,7 +114,7 @@ def batch_process(
 
         res = process_session(str(entry), method=method,
                               with_visualization=with_visualization,
-                              max_tolerance=max_tolerance)
+                              max_tolerance_s=max_tolerance_s)
         results.append(res)
 
     return results
@@ -136,12 +136,12 @@ def _stats_alignment(
 ) -> dict:
     idx = synced.get("imu_indices")
     if idx is not None:
-        deltas = np.abs(imu["timestamps"][idx] - synced["timestamps"]) * 1000
-        error_mean = float(np.mean(deltas))
-        error_median = float(np.median(deltas))
-        error_p90 = float(np.percentile(deltas, 90))
-        error_p99 = float(np.percentile(deltas, 99))
-        pct_under_5ms = float(np.mean(deltas < 5.0) * 100)
+        deltas_ms = np.abs(imu["timestamps"][idx] - synced["timestamps"]) * 1000
+        error_mean = float(np.mean(deltas_ms))
+        error_median = float(np.median(deltas_ms))
+        error_p90 = float(np.percentile(deltas_ms, 90))
+        error_p99 = float(np.percentile(deltas_ms, 99))
+        pct_under_5ms = float(np.mean(deltas_ms < 5.0) * 100)
         boundary_frames = int(
             np.sum(cam["timestamps"] < imu["timestamps"][0])
             + np.sum(cam["timestamps"] > imu["timestamps"][-1])

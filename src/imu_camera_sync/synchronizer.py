@@ -10,7 +10,7 @@ def align(
     imu_data: dict,
     camera_data: dict,
     method: str = "nearest",
-    max_tolerance: float = 0.05,
+    max_tolerance_s: float = 0.05,
 ) -> dict:
     """
     Align IMU and camera data to a common timeline.
@@ -24,8 +24,8 @@ def align(
     method : str
         'nearest' — nearest-neighbor matching
         'interp'  — linear interpolation
-    max_tolerance : float
-        Maximum allowed time difference (seconds) between a camera frame
+    max_tolerance_s : float
+        Maximum allowed time difference in seconds between a camera frame
         and its matched IMU sample. Frames exceeding this threshold are
         dropped. Only applies to 'nearest' method. Default 0.05 s (50 ms).
 
@@ -40,7 +40,7 @@ def align(
     cam_ts = camera_data["timestamps"]
 
     if method == "nearest":
-        return _align_nearest(imu_data, imu_ts, cam_ts, max_tolerance)
+        return _align_nearest(imu_data, imu_ts, cam_ts, max_tolerance_s)
     elif method == "interp":
         return _align_interp(imu_data, imu_ts, cam_ts)
     else:
@@ -51,17 +51,17 @@ def _align_nearest(
     imu_data: dict,
     imu_ts: np.ndarray,
     cam_ts: np.ndarray,
-    max_tolerance: float,
+    max_tolerance_s: float,
 ) -> dict:
     idx = np.searchsorted(imu_ts, cam_ts)
     idx = np.clip(idx, 1, len(imu_ts) - 1)
 
-    left_diff = np.abs(imu_ts[idx - 1] - cam_ts)
-    right_diff = np.abs(imu_ts[idx] - cam_ts)
-    nearest_idx = np.where(left_diff <= right_diff, idx - 1, idx)
+    left_diff_s = np.abs(imu_ts[idx - 1] - cam_ts)
+    right_diff_s = np.abs(imu_ts[idx] - cam_ts)
+    nearest_idx = np.where(left_diff_s <= right_diff_s, idx - 1, idx)
 
-    time_diff = np.abs(imu_ts[nearest_idx] - cam_ts)
-    valid_mask = time_diff <= max_tolerance
+    time_diff_s = np.abs(imu_ts[nearest_idx] - cam_ts)
+    valid_mask = time_diff_s <= max_tolerance_s
     n_dropped = int(np.sum(~valid_mask))
 
     return {

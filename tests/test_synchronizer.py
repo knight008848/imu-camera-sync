@@ -100,13 +100,13 @@ def test_align_interp_out_of_range_clamped():
 
 
 def test_align_nearest_tolerance_drops_stale_matches():
-    """Frames whose nearest IMU sample exceeds max_tolerance are dropped."""
+    """Frames whose nearest IMU sample exceeds max_tolerance_s are dropped."""
     imu = make_imu_data(100)  # 0..0.99 s
     # Camera extends 0.5 s beyond IMU range
     ts = np.linspace(0.0, 1.5, 46)  # 0..1.5 s, ~15 frames past IMU end
     cam = {"timestamps": ts, "fps": 30.0, "frame_count": 46}
 
-    synced = synchronizer.align(imu, cam, method="nearest", max_tolerance=0.05)
+    synced = synchronizer.align(imu, cam, method="nearest", max_tolerance_s=0.05)
 
     n_expected = len(ts)
     n_survived = len(synced["timestamps"])
@@ -120,13 +120,13 @@ def test_align_nearest_tolerance_drops_stale_matches():
 
 
 def test_align_nearest_custom_tolerance():
-    """max_tolerance parameter controls filtering aggressiveness."""
+    """max_tolerance_s parameter controls filtering aggressiveness."""
     imu = make_imu_data(100)  # 0..0.99 s
     ts = np.linspace(0.0, 1.5, 46)
     cam = {"timestamps": ts, "fps": 30.0, "frame_count": 46}
 
-    strict = synchronizer.align(imu, cam, method="nearest", max_tolerance=0.01)
-    loose = synchronizer.align(imu, cam, method="nearest", max_tolerance=1.0)
+    strict = synchronizer.align(imu, cam, method="nearest", max_tolerance_s=0.01)
+    loose = synchronizer.align(imu, cam, method="nearest", max_tolerance_s=1.0)
 
     assert strict["dropped"] >= loose["dropped"]
 

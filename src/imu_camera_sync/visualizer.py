@@ -10,23 +10,23 @@ def plot_timestamps(imu_data: dict, camera_data: dict, show: bool = True):
     imu_ts = imu_data["timestamps"]
     cam_ts = camera_data["timestamps"]
 
-    imu_intervals = np.diff(imu_ts) * 1000  # ms
-    cam_intervals = np.diff(cam_ts) * 1000
+    imu_intervals_ms = np.diff(imu_ts) * 1000
+    cam_intervals_ms = np.diff(cam_ts) * 1000
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
-    sns.histplot(imu_intervals, bins=50, kde=True, ax=axes[0])
-    median_imu = np.median(imu_intervals)
-    axes[0].axvline(median_imu, color="red", linestyle="--",
-                    label=f"median={median_imu:.2f}ms")
+    sns.histplot(imu_intervals_ms, bins=50, kde=True, ax=axes[0])
+    median_imu_ms = np.median(imu_intervals_ms)
+    axes[0].axvline(median_imu_ms, color="red", linestyle="--",
+                    label=f"median={median_imu_ms:.2f}ms")
     axes[0].set_title("IMU Sample Intervals")
     axes[0].set_xlabel("Interval (ms)")
     axes[0].legend()
 
-    sns.histplot(cam_intervals, bins=50, kde=True, ax=axes[1])
-    median_cam = np.median(cam_intervals)
-    axes[1].axvline(median_cam, color="red", linestyle="--",
-                    label=f"median={median_cam:.2f}ms")
+    sns.histplot(cam_intervals_ms, bins=50, kde=True, ax=axes[1])
+    median_cam_ms = np.median(cam_intervals_ms)
+    axes[1].axvline(median_cam_ms, color="red", linestyle="--",
+                    label=f"median={median_cam_ms:.2f}ms")
     axes[1].set_title("Camera Frame Intervals")
     axes[1].set_xlabel("Interval (ms)")
     axes[1].legend()
@@ -57,8 +57,8 @@ def plot_sync_quality(
     imu_ts = imu_data["timestamps"]
 
     if "imu_indices" in synced and synced["imu_indices"] is not None:
-        deltas = (imu_ts[synced["imu_indices"]] - synced["timestamps"]) * 1000  # ms
-        sns.histplot(deltas, bins=50, kde=True, ax=axes[0])
+        deltas_ms = (imu_ts[synced["imu_indices"]] - synced["timestamps"]) * 1000
+        sns.histplot(deltas_ms, bins=50, kde=True, ax=axes[0])
         axes[0].axvline(0, color="red", linestyle="--")
         axes[0].set_title("Alignment Error (Nearest-Neighbor)")
         axes[0].set_xlabel("Timestamp delta (ms)")

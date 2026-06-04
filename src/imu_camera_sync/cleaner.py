@@ -35,15 +35,15 @@ def clean_camera(camera_data: dict) -> dict:
     (frame_index, interval_s, expected_s, delta_s) for each gap.
     """
     ts = camera_data["timestamps"].copy()
-    intervals = np.diff(ts)
-    expected = np.median(intervals)
-    gaps = intervals > 1.5 * expected
+    intervals_s = np.diff(ts)
+    expected_s = np.median(intervals_s)
+    gaps = intervals_s > 1.5 * expected_s
 
     dropped_gaps = []
     if np.any(gaps):
         for i in np.where(gaps)[0]:
-            dropped_gaps.append((int(i), float(intervals[i]), float(expected),
-                                 float(intervals[i] - expected)))
+            dropped_gaps.append((int(i), float(intervals_s[i]), float(expected_s),
+                                 float(intervals_s[i] - expected_s)))
 
     return {
         "timestamps": ts,
@@ -94,9 +94,9 @@ def _repair_timestamps(ts: np.ndarray) -> tuple[np.ndarray, list]:
     repaired = ts.copy()
     jumps = []
     for i in range(1, len(repaired)):
-        delta = repaired[i] - repaired[i - 1]
-        if delta < -1e-4:
-            jumps.append((i, float(repaired[i - 1]), float(repaired[i]), float(delta)))
-        if delta <= 0:
+        delta_s = repaired[i] - repaired[i - 1]
+        if delta_s < -1e-4:
+            jumps.append((i, float(repaired[i - 1]), float(repaired[i]), float(delta_s)))
+        if delta_s <= 0:
             repaired[i] = repaired[i - 1] + 1e-9
     return repaired, jumps
