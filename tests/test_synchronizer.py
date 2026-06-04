@@ -97,3 +97,45 @@ def test_align_interp_out_of_range_clamped():
     out_right = ts > imu["timestamps"][-1]  # last 3 frames
     for i in np.where(out_right)[0]:
         np.testing.assert_array_equal(synced["accel_aligned"][i], imu["accel"][-1])
+
+
+def test_to_csv_nearest(tmp_path):
+    imu = make_imu_data(200)
+    cam = make_cam_data(10)
+    synced = synchronizer.align(imu, cam, method="nearest")
+    out = tmp_path / "aligned.csv"
+    synchronizer.to_csv(synced, str(out))
+    lines = out.read_text().strip().splitlines()
+    assert len(lines) == 11  # header + 10 rows
+    assert "imu_index" in lines[0]
+    assert "accel_x" in lines[0]
+
+
+def test_to_csv_interp(tmp_path):
+    imu = make_imu_data(200)
+    cam = make_cam_data(10)
+    synced = synchronizer.align(imu, cam, method="interp")
+    out = tmp_path / "aligned.csv"
+    synchronizer.to_csv(synced, str(out))
+    lines = out.read_text().strip().splitlines()
+    assert len(lines) == 11
+    assert "imu_index" not in lines[0]
+
+
+def test_to_csv_values(tmp_path):
+    imu = {
+        "timestamps": np.array([0.0, 0.01, 0.02]),
+        "accel": np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=np.float64),
+        "gyro": np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6], [0.7, 0.8, 0.9]], dtype=np.float64),
+    }
+    cam = {"timestamps": np.array([0.0, 0.02])}
+    synced = synchronizer.align(imu, cam, method="nearest")
+    out = tmp_path / "aligned.csv"
+    synchronizer.to_csv(synced, str(out))
+    lines = out.read_text().strip().splitlines()
+    # Check first data row values
+    row0 = lines[1].split(",")
+    assert float(row0[0]) == 0.0
+    assert float(row0[1]) == 1.0  # accel_x
+    assert float(row0[2]) == 2.0  # accel_y
+    assert float(row0[3]) == 3.0  # accel_z

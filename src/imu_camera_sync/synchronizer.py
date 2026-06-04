@@ -1,5 +1,7 @@
 """Time synchronization: interpolation, nearest-neighbor, resampling."""
 
+import csv
+
 import numpy as np
 from scipy import interpolate
 
@@ -70,3 +72,28 @@ def _align_interp(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> dic
         "gyro_aligned": gyro_interp,
         "imu_indices": None,
     }
+
+
+def to_csv(synced: dict, path: str) -> None:
+    """Export aligned data as a flat CSV table.
+
+    Columns: timestamp, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z
+    Plus imu_index when available (nearest mode; omitted in interp mode).
+    """
+    timestamps = synced["timestamps"]
+    accel = synced["accel_aligned"]
+    gyro = synced["gyro_aligned"]
+    imu_indices = synced.get("imu_indices")
+
+    headers = ["timestamp", "accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z"]
+    if imu_indices is not None:
+        headers.append("imu_index")
+
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        for i in range(len(timestamps)):
+            row = [timestamps[i], *accel[i], *gyro[i]]
+            if imu_indices is not None:
+                row.append(imu_indices[i])
+            writer.writerow(row)
