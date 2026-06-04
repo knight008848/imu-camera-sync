@@ -187,6 +187,7 @@ def test_load_camera_odometry_missing_timestamp_col():
 
 
 def test_load_camera_odometry_single_row():
+    """Single-row odometry: warns and truncates to 1 frame instead of raising."""
     import cv2
 
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as vf:
@@ -203,8 +204,41 @@ def test_load_camera_odometry_single_row():
             writer.write(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
         writer.release()
 
-        with pytest.raises(ValueError, match="need at least 2"):
-            loader.load_camera(video_path, odometry_path=odom_path)
+        with pytest.warns(UserWarning, match="Truncating"):
+            data = loader.load_camera(video_path, odometry_path=odom_path)
+
+        assert data["frame_count"] == 1
+        assert len(data["timestamps"]) == 1
+        assert data["timestamps"][0] == 0.0
+    finally:
+        Path(video_path).unlink()
+        Path(odom_path).unlink()
+
+
+def test_load_camera_odometry_truncates_extra_frames():
+    """When odometry has fewer timestamps than video frames, truncate and warn."""
+    import cv2
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as vf:
+        video_path = vf.name
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as of:
+        of.write("timestamp,x,y,z\n0.0,1,2,3\n0.033,4,5,6\n0.067,7,8,9\n")
+        odom_path = of.name
+
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(video_path, fourcc, 30.0, (64, 64))
+        for _ in range(10):
+            writer.write(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
+        writer.release()
+
+        with pytest.warns(UserWarning, match="Truncating"):
+            data = loader.load_camera(video_path, odometry_path=odom_path)
+
+        assert data["frame_count"] == 3  # truncated from 10
+        assert len(data["timestamps"]) == 3
+        np.testing.assert_array_almost_equal(data["timestamps"], [0.0, 0.033, 0.067])
     finally:
         Path(video_path).unlink()
         Path(odom_path).unlink()

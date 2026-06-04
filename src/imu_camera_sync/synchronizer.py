@@ -6,7 +6,12 @@ import numpy as np
 from scipy import interpolate
 
 
-def align(imu_data: dict, camera_data: dict, method: str = "nearest") -> dict:
+def align(
+    imu_data: dict,
+    camera_data: dict,
+    method: str = "nearest",
+    max_tolerance: float = 0.05,
+) -> dict:
     """
     Align IMU and camera data to a common timeline.
 
@@ -19,25 +24,35 @@ def align(imu_data: dict, camera_data: dict, method: str = "nearest") -> dict:
     method : str
         'nearest' — nearest-neighbor matching
         'interp'  — linear interpolation
+    max_tolerance : float
+        Maximum allowed time difference (seconds) between a camera frame
+        and its matched IMU sample. Frames exceeding this threshold are
+        dropped. Only applies to 'nearest' method. Default 0.05 s (50 ms).
 
     Returns aligned data dict with keys:
-    - timestamps: shared camera timestamps
+    - timestamps: camera timestamps for valid frames
     - accel_aligned: Nx3 array
     - gyro_aligned: Nx3 array
     - imu_indices: indices into the original IMU data
+    - dropped: number of frames dropped due to tolerance (0 if none)
     """
     imu_ts = imu_data["timestamps"]
     cam_ts = camera_data["timestamps"]
 
     if method == "nearest":
-        return _align_nearest(imu_data, imu_ts, cam_ts)
+        return _align_nearest(imu_data, imu_ts, cam_ts, max_tolerance)
     elif method == "interp":
         return _align_interp(imu_data, imu_ts, cam_ts)
     else:
         raise ValueError(f"Unknown alignment method: {method}")
 
 
-def _align_nearest(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> dict:
+def _align_nearest(
+    imu_data: dict,
+    imu_ts: np.ndarray,
+    cam_ts: np.ndarray,
+    max_tolerance: float,
+) -> dict:
     idx = np.searchsorted(imu_ts, cam_ts)
     idx = np.clip(idx, 1, len(imu_ts) - 1)
 
@@ -45,11 +60,16 @@ def _align_nearest(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> di
     right_diff = np.abs(imu_ts[idx] - cam_ts)
     nearest_idx = np.where(left_diff <= right_diff, idx - 1, idx)
 
+    time_diff = np.abs(imu_ts[nearest_idx] - cam_ts)
+    valid_mask = time_diff <= max_tolerance
+    n_dropped = int(np.sum(~valid_mask))
+
     return {
-        "timestamps": cam_ts.copy(),
-        "accel_aligned": imu_data["accel"][nearest_idx],
-        "gyro_aligned": imu_data["gyro"][nearest_idx],
-        "imu_indices": nearest_idx,
+        "timestamps": cam_ts[valid_mask].copy(),
+        "accel_aligned": imu_data["accel"][nearest_idx[valid_mask]],
+        "gyro_aligned": imu_data["gyro"][nearest_idx[valid_mask]],
+        "imu_indices": nearest_idx[valid_mask],
+        "dropped": n_dropped,
     }
 
 
@@ -71,6 +91,7 @@ def _align_interp(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> dic
         "accel_aligned": accel_interp,
         "gyro_aligned": gyro_interp,
         "imu_indices": None,
+        "dropped": 0,
     }
 
 

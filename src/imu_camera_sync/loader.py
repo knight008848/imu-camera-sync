@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import warnings
 from pathlib import Path
 
 import cv2
@@ -89,17 +90,12 @@ def load_camera(path: str | Path, odometry_path: str | Path | None = None):
         odom_ts = odom["timestamp"].to_numpy(dtype=np.float64)
 
         if len(odom_ts) < frame_count:
-            if len(odom_ts) <= 1:
-                raise ValueError(
-                    f"Odometry has {len(odom_ts)} timestamp(s), "
-                    f"need at least 2 to extrapolate for {frame_count} frames."
-                )
-            expected_interval = np.median(np.diff(odom_ts))
-            n_pad = frame_count - len(odom_ts)
-            odom_ts = np.concatenate([
-                odom_ts,
-                odom_ts[-1] + np.arange(1, n_pad + 1) * expected_interval,
-            ])
+            warnings.warn(
+                f"Odometry has {len(odom_ts)} timestamps but video has "
+                f"{frame_count} frames. Truncating to {len(odom_ts)} frames "
+                f"({frame_count - len(odom_ts)} frames dropped)."
+            )
+            frame_count = len(odom_ts)
         timestamps = odom_ts[:frame_count]
     else:
         creation_utc = _extract_creation_time(path)

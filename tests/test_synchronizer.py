@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from imu_camera_sync import synchronizer
 
@@ -25,6 +26,7 @@ def test_align_nearest():
     assert synced["imu_indices"].shape == (60,)
     assert synced["imu_indices"].min() >= 0
     assert synced["imu_indices"].max() < 200
+    assert synced["dropped"] == 0
 
 
 def test_align_nearest_max_error():
@@ -48,17 +50,14 @@ def test_align_interp():
     assert synced["accel_aligned"].shape == (60, 3)
     assert synced["gyro_aligned"].shape == (60, 3)
     assert synced["imu_indices"] is None
+    assert synced["dropped"] == 0
 
 
 def test_align_unknown_method():
     imu = make_imu_data()
     cam = make_cam_data()
-    try:
+    with pytest.raises(ValueError):
         synchronizer.align(imu, cam, method="invalid")
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("Expected ValueError")
 
 
 def test_align_nearest_with_gappy_camera():
@@ -77,6 +76,7 @@ def test_align_nearest_with_gappy_camera():
     # Max error should be bounded by the largest IMU interval
     max_imu_interval = np.max(np.diff(imu["timestamps"]))
     assert np.all(np.abs(matched_ts - cam["timestamps"]) <= max_imu_interval + 1e-9)
+    assert synced["dropped"] == 0
 
 
 def test_align_interp_out_of_range_clamped():
@@ -97,6 +97,38 @@ def test_align_interp_out_of_range_clamped():
     out_right = ts > imu["timestamps"][-1]  # last 3 frames
     for i in np.where(out_right)[0]:
         np.testing.assert_array_equal(synced["accel_aligned"][i], imu["accel"][-1])
+
+
+def test_align_nearest_tolerance_drops_stale_matches():
+    """Frames whose nearest IMU sample exceeds max_tolerance are dropped."""
+    imu = make_imu_data(100)  # 0..0.99 s
+    # Camera extends 0.5 s beyond IMU range
+    ts = np.linspace(0.0, 1.5, 46)  # 0..1.5 s, ~15 frames past IMU end
+    cam = {"timestamps": ts, "fps": 30.0, "frame_count": 46}
+
+    synced = synchronizer.align(imu, cam, method="nearest", max_tolerance=0.05)
+
+    n_expected = len(ts)
+    n_survived = len(synced["timestamps"])
+    assert n_survived < n_expected
+    assert synced["dropped"] == n_expected - n_survived
+    # All surviving frames must be within tolerance
+    matched_ts = imu["timestamps"][synced["imu_indices"]]
+    assert np.all(np.abs(matched_ts - synced["timestamps"]) <= 0.05 + 1e-9)
+    # Dropped frames should all be beyond IMU coverage
+    assert n_survived > 0
+
+
+def test_align_nearest_custom_tolerance():
+    """max_tolerance parameter controls filtering aggressiveness."""
+    imu = make_imu_data(100)  # 0..0.99 s
+    ts = np.linspace(0.0, 1.5, 46)
+    cam = {"timestamps": ts, "fps": 30.0, "frame_count": 46}
+
+    strict = synchronizer.align(imu, cam, method="nearest", max_tolerance=0.01)
+    loose = synchronizer.align(imu, cam, method="nearest", max_tolerance=1.0)
+
+    assert strict["dropped"] >= loose["dropped"]
 
 
 def test_to_csv_nearest(tmp_path):

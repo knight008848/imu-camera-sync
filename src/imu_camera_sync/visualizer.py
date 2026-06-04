@@ -55,10 +55,9 @@ def plot_sync_quality(
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
     imu_ts = imu_data["timestamps"]
-    cam_ts = camera_data["timestamps"]
 
     if "imu_indices" in synced and synced["imu_indices"] is not None:
-        deltas = (imu_ts[synced["imu_indices"]] - cam_ts) * 1000  # ms
+        deltas = (imu_ts[synced["imu_indices"]] - synced["timestamps"]) * 1000  # ms
         sns.histplot(deltas, bins=50, kde=True, ax=axes[0])
         axes[0].axvline(0, color="red", linestyle="--")
         axes[0].set_title("Alignment Error (Nearest-Neighbor)")
@@ -69,10 +68,10 @@ def plot_sync_quality(
         axes[0].set_title("Alignment Error (N/A)")
 
     imu_rel = imu_ts - imu_ts[0]
-    cam_rel = cam_ts - cam_ts[0]
+    synced_rel = synced["timestamps"] - synced["timestamps"][0]
     sns.scatterplot(x=imu_rel[::10], y=imu_data["accel"][::10, 0],
                     s=4, alpha=0.5, label="IMU (orig)", ax=axes[1])
-    sns.scatterplot(x=cam_rel, y=synced["accel_aligned"][:, 0],
+    sns.scatterplot(x=synced_rel, y=synced["accel_aligned"][:, 0],
                     s=4, alpha=0.5, label="Aligned", ax=axes[1])
     axes[1].set_title("Accel X: Before vs Aligned")
     axes[1].set_xlabel("Time (s)")
