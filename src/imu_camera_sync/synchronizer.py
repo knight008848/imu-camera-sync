@@ -5,12 +5,14 @@ import csv
 import numpy as np
 from scipy import interpolate
 
+_DEFAULT_TOLERANCE_S = 0.05  # 50 ms — half the typical 100 Hz IMU interval
+
 
 def align(
     imu_data: dict,
     camera_data: dict,
     method: str = "nearest",
-    max_tolerance_s: float = 0.05,
+    max_tolerance_s: float = _DEFAULT_TOLERANCE_S,
 ) -> dict:
     """
     Align IMU and camera data to a common timeline.

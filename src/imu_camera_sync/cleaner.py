@@ -3,6 +3,12 @@
 import numpy as np
 from scipy import interpolate
 
+# ── thresholds ───────────────────────────────────────────────────────────────
+_GAP_MULTIPLIER = 1.5          # interval > expected * this → dropped-frame gap
+_MAD_THRESHOLD = 5.0           # MAD multiplier for outlier detection
+_MAD_NORMAL_SCALE = 0.6745     # MAD → σ conversion factor (1 / Φ⁻¹(3/4))
+_MIN_BACKWARD_JUMP_S = 1e-4    # timestamp jumps below this are treated as noise
+
 
 def clean_imu(imu_data: dict) -> dict:
     """
@@ -37,7 +43,7 @@ def clean_camera(camera_data: dict) -> dict:
     ts = camera_data["timestamps"].copy()
     intervals_s = np.diff(ts)
     expected_s = np.median(intervals_s)
-    gaps = intervals_s > 1.5 * expected_s
+    gaps = intervals_s > _GAP_MULTIPLIER * expected_s
 
     dropped_gaps = []
     if np.any(gaps):
@@ -68,7 +74,7 @@ def _clean_signal(data: np.ndarray) -> np.ndarray:
         mad = np.median(np.abs(col - median))
         if mad == 0:
             continue
-        threshold = 5.0 * mad / 0.6745
+        threshold = _MAD_THRESHOLD * mad / _MAD_NORMAL_SCALE
         outliers = np.abs(col - median) > threshold
 
         if np.any(outliers):
@@ -95,7 +101,7 @@ def _repair_timestamps(ts: np.ndarray) -> tuple[np.ndarray, list]:
     jumps = []
     for i in range(1, len(repaired)):
         delta_s = repaired[i] - repaired[i - 1]
-        if delta_s < -1e-4:
+        if delta_s < -_MIN_BACKWARD_JUMP_S:
             jumps.append((i, float(repaired[i - 1]), float(repaired[i]), float(delta_s)))
         if delta_s <= 0:
             repaired[i] = repaired[i - 1] + 1e-9

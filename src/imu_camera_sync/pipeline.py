@@ -9,12 +9,16 @@ import numpy as np
 
 from . import cleaner, loader, synchronizer
 
+# ── thresholds ───────────────────────────────────────────────────────────────
+_GAP_MULTIPLIER = 1.5           # interval > expected * this → dropped-frame gap
+_GOOD_ALIGNMENT_MS = 5.0        # alignment error below this is considered "good"
+
 
 def process_session(
     session_dir: str,
     method: str = "nearest",
     with_visualization: bool = False,
-    max_tolerance_s: float = 0.05,
+    max_tolerance_s: float = synchronizer._DEFAULT_TOLERANCE_S,
 ) -> dict:
     """Run the full pipeline on a single session directory.
 
@@ -56,7 +60,7 @@ def process_session(
         # ── camera stats ──
         cam_intervals_ms = np.diff(camera_raw["timestamps"]) * 1000
         expected_interval_ms = 1000.0 / camera_raw["fps"]
-        gap_count = int(np.sum(cam_intervals_ms > expected_interval_ms * 1.5))
+        gap_count = int(np.sum(cam_intervals_ms > expected_interval_ms * _GAP_MULTIPLIER))
         result["camera"] = {
             "frames": camera_raw["frame_count"],
             "duration_s": float(camera_raw["timestamps"][-1] - camera_raw["timestamps"][0]),
@@ -96,7 +100,7 @@ def batch_process(
     data_root: str = "data",
     method: str = "nearest",
     with_visualization: bool = False,
-    max_tolerance_s: float = 0.05,
+    max_tolerance_s: float = synchronizer._DEFAULT_TOLERANCE_S,
 ) -> list[dict]:
     """Process every session directory under ``data_root``.
 
@@ -141,7 +145,7 @@ def _stats_alignment(
         error_median = float(np.median(deltas_ms))
         error_p90 = float(np.percentile(deltas_ms, 90))
         error_p99 = float(np.percentile(deltas_ms, 99))
-        pct_under_5ms = float(np.mean(deltas_ms < 5.0) * 100)
+        pct_under_5ms = float(np.mean(deltas_ms < _GOOD_ALIGNMENT_MS) * 100)
         boundary_frames = int(
             np.sum(cam["timestamps"] < imu["timestamps"][0])
             + np.sum(cam["timestamps"] > imu["timestamps"][-1])
