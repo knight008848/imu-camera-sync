@@ -3,11 +3,13 @@ import pytest
 
 from imu_camera_sync import synchronizer
 
+_RNG = np.random.default_rng(42)
+
 
 def make_imu_data(n=100):
     ts = np.arange(n, dtype=np.float64) / 100.0
-    accel = np.random.randn(n, 3).astype(np.float64)
-    gyro = np.random.randn(n, 3).astype(np.float64)
+    accel = _RNG.standard_normal((n, 3), dtype=np.float64)
+    gyro = _RNG.standard_normal((n, 3), dtype=np.float64)
     return {"timestamps": ts, "accel": accel, "gyro": gyro}
 
 

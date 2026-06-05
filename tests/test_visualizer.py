@@ -6,11 +6,13 @@ import numpy as np
 
 from imu_camera_sync import cleaner, synchronizer, visualizer
 
+_RNG = np.random.default_rng(42)
+
 
 def make_imu_data(n=100):
     ts = np.arange(n, dtype=np.float64) / 100.0
-    accel = np.random.randn(n, 3).astype(np.float64)
-    gyro = np.random.randn(n, 3).astype(np.float64)
+    accel = _RNG.standard_normal((n, 3), dtype=np.float64)
+    gyro = _RNG.standard_normal((n, 3), dtype=np.float64)
     return {"timestamps": ts, "accel": accel, "gyro": gyro}
 
 
@@ -27,6 +29,7 @@ def test_plot_timestamps():
     fig = visualizer.plot_timestamps(imu, cam, show=False)
     assert fig is not None
     import matplotlib.pyplot as plt
+
     plt.close(fig)
 
 
@@ -39,4 +42,5 @@ def test_plot_sync_quality():
     fig = visualizer.plot_sync_quality(imu_c, cam, synced, show=False)
     assert fig is not None
     import matplotlib.pyplot as plt
+
     plt.close(fig)

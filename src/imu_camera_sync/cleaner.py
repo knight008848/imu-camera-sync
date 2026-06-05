@@ -4,10 +4,10 @@ import numpy as np
 from scipy import interpolate
 
 # ── thresholds ───────────────────────────────────────────────────────────────
-_GAP_MULTIPLIER = 1.5          # interval > expected * this → dropped-frame gap
-_MAD_THRESHOLD = 5.0           # MAD multiplier for outlier detection
-_MAD_NORMAL_SCALE = 0.6745     # MAD → σ conversion factor (1 / Φ⁻¹(3/4))
-_MIN_BACKWARD_JUMP_S = 1e-4    # timestamp jumps below this are treated as noise
+_GAP_MULTIPLIER = 1.5  # interval > expected * this → dropped-frame gap
+_MAD_THRESHOLD = 5.0  # MAD multiplier for outlier detection
+_MAD_NORMAL_SCALE = 0.6745  # MAD → σ conversion factor (1 / Φ⁻¹(3/4))
+_MIN_BACKWARD_JUMP_S = 1e-4  # timestamp jumps below this are treated as noise
 
 
 def clean_imu(imu_data: dict) -> dict:
@@ -48,8 +48,7 @@ def clean_camera(camera_data: dict) -> dict:
     dropped_gaps = []
     if np.any(gaps):
         for i in np.where(gaps)[0]:
-            dropped_gaps.append((int(i), float(intervals_s[i]), float(expected_s),
-                                 float(intervals_s[i] - expected_s)))
+            dropped_gaps.append((int(i), float(intervals_s[i]), float(expected_s), float(intervals_s[i] - expected_s)))
 
     return {
         "timestamps": ts,
@@ -82,7 +81,9 @@ def _clean_signal(data: np.ndarray) -> np.ndarray:
             x_in = np.arange(n)[inliers]
             y_in = col[inliers]
             f = interpolate.interp1d(
-                x_in, y_in, kind="linear",
+                x_in,
+                y_in,
+                kind="linear",
                 bounds_error=False,
                 fill_value=(float(y_in[0]), float(y_in[-1])),
             )

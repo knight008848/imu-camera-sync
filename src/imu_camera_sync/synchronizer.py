@@ -77,13 +77,19 @@ def _align_nearest(
 
 def _align_interp(imu_data: dict, imu_ts: np.ndarray, cam_ts: np.ndarray) -> dict:
     accel_interp = interpolate.interp1d(
-        imu_ts, imu_data["accel"], axis=0, kind="linear",
+        imu_ts,
+        imu_data["accel"],
+        axis=0,
+        kind="linear",
         bounds_error=False,
         fill_value=(imu_data["accel"][0], imu_data["accel"][-1]),
     )(cam_ts)
 
     gyro_interp = interpolate.interp1d(
-        imu_ts, imu_data["gyro"], axis=0, kind="linear",
+        imu_ts,
+        imu_data["gyro"],
+        axis=0,
+        kind="linear",
         bounds_error=False,
         fill_value=(imu_data["gyro"][0], imu_data["gyro"][-1]),
     )(cam_ts)

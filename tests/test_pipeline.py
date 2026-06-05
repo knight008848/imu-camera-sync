@@ -13,16 +13,16 @@ def _make_session_dir(tmp_path, with_odometry=True, n_frames=10, name="test_sess
     session.mkdir()
 
     # ── imu.csv (100Hz, slightly longer than camera) ──
+    rng = np.random.default_rng(42)
     n_imu = (n_frames * 2) + 10  # ~2x camera, plus padding
     imu_ts = np.arange(n_imu, dtype=np.float64) / 100.0
-    accel = np.random.randn(n_imu, 3).astype(np.float64)
-    gyro = np.random.randn(n_imu, 3).astype(np.float64)
+    accel = rng.standard_normal((n_imu, 3), dtype=np.float64)
+    gyro = rng.standard_normal((n_imu, 3), dtype=np.float64)
 
     imu_lines = ["timestamp,a_x,a_y,a_z,alpha_x,alpha_y,alpha_z"]
     for i in range(n_imu):
         imu_lines.append(
-            f"{imu_ts[i]},{accel[i][0]},{accel[i][1]},{accel[i][2]},"
-            f"{gyro[i][0]},{gyro[i][1]},{gyro[i][2]}"
+            f"{imu_ts[i]},{accel[i][0]},{accel[i][1]},{accel[i][2]},{gyro[i][0]},{gyro[i][1]},{gyro[i][2]}"
         )
     (session / "imu.csv").write_text("\n".join(imu_lines))
 
@@ -85,9 +85,7 @@ class TestProcessSession:
 
     def test_with_visualization(self, tmp_path):
         session = _make_session_dir(tmp_path, n_frames=120)
-        result = pipeline.process_session(
-            session, method="nearest", with_visualization=True
-        )
+        result = pipeline.process_session(session, method="nearest", with_visualization=True)
         assert Path(result["output"]).parent.joinpath("timestamps.png").exists()
         assert Path(result["output"]).parent.joinpath("sync_quality.png").exists()
 

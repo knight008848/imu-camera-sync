@@ -24,15 +24,16 @@ def load_imu(path: str | Path):
 
     required = [
         "timestamp",
-        "a_x", "a_y", "a_z",
-        "alpha_x", "alpha_y", "alpha_z",
+        "a_x",
+        "a_y",
+        "a_z",
+        "alpha_x",
+        "alpha_y",
+        "alpha_z",
     ]
     missing = [c for c in required if c not in df.columns]
     if missing:
-        raise ValueError(
-            f"IMU CSV is missing required columns: {missing}. "
-            f"Found: {list(df.columns)}"
-        )
+        raise ValueError(f"IMU CSV is missing required columns: {missing}. Found: {list(df.columns)}")
 
     timestamps = df["timestamp"].to_numpy(dtype=np.float64)
 
@@ -82,10 +83,7 @@ def load_camera(path: str | Path, odometry_path: str | Path | None = None):
         odom.columns = [c.strip() for c in odom.columns]
 
         if "timestamp" not in odom.columns:
-            raise ValueError(
-                f"Odometry CSV must contain a 'timestamp' column. "
-                f"Found: {list(odom.columns)}"
-            )
+            raise ValueError(f"Odometry CSV must contain a 'timestamp' column. Found: {list(odom.columns)}")
 
         odom_ts = odom["timestamp"].to_numpy(dtype=np.float64)
 
@@ -119,9 +117,10 @@ def _extract_creation_time(path: str | Path) -> float | None:
     """
     try:
         result = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-print_format", "json",
-             "-show_format", str(path)],
-            capture_output=True, text=True, timeout=10,
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         info = json.loads(result.stdout)
         creation_str = info["format"]["tags"]["creation_time"]
@@ -129,6 +128,5 @@ def _extract_creation_time(path: str | Path) -> float | None:
 
         dt = datetime.fromisoformat(creation_str.replace("Z", "+00:00"))
         return dt.timestamp()
-    except (FileNotFoundError, KeyError, json.JSONDecodeError,
-            subprocess.TimeoutExpired, ValueError):
+    except (FileNotFoundError, KeyError, json.JSONDecodeError, subprocess.TimeoutExpired, ValueError):
         return None

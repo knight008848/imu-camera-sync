@@ -17,16 +17,14 @@ def plot_timestamps(imu_data: dict, camera_data: dict, show: bool = True):
 
     sns.histplot(imu_intervals_ms, bins=50, kde=True, ax=axes[0])
     median_imu_ms = np.median(imu_intervals_ms)
-    axes[0].axvline(median_imu_ms, color="red", linestyle="--",
-                    label=f"median={median_imu_ms:.2f}ms")
+    axes[0].axvline(median_imu_ms, color="red", linestyle="--", label=f"median={median_imu_ms:.2f}ms")
     axes[0].set_title("IMU Sample Intervals")
     axes[0].set_xlabel("Interval (ms)")
     axes[0].legend()
 
     sns.histplot(cam_intervals_ms, bins=50, kde=True, ax=axes[1])
     median_cam_ms = np.median(cam_intervals_ms)
-    axes[1].axvline(median_cam_ms, color="red", linestyle="--",
-                    label=f"median={median_cam_ms:.2f}ms")
+    axes[1].axvline(median_cam_ms, color="red", linestyle="--", label=f"median={median_cam_ms:.2f}ms")
     axes[1].set_title("Camera Frame Intervals")
     axes[1].set_xlabel("Interval (ms)")
     axes[1].legend()
@@ -48,9 +46,7 @@ def plot_timestamps(imu_data: dict, camera_data: dict, show: bool = True):
     return fig
 
 
-def plot_sync_quality(
-    imu_data: dict, camera_data: dict, synced: dict, show: bool = True
-):
+def plot_sync_quality(imu_data: dict, camera_data: dict, synced: dict, show: bool = True):
     """Plot before/after alignment comparison."""
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
@@ -63,16 +59,13 @@ def plot_sync_quality(
         axes[0].set_title("Alignment Error (Nearest-Neighbor)")
         axes[0].set_xlabel("Timestamp delta (ms)")
     else:
-        axes[0].text(0.5, 0.5, "No imu_indices (interp mode)", ha="center",
-                     va="center", transform=axes[0].transAxes)
+        axes[0].text(0.5, 0.5, "No imu_indices (interp mode)", ha="center", va="center", transform=axes[0].transAxes)
         axes[0].set_title("Alignment Error (N/A)")
 
     imu_rel = imu_ts - imu_ts[0]
     synced_rel = synced["timestamps"] - synced["timestamps"][0]
-    sns.scatterplot(x=imu_rel[::10], y=imu_data["accel"][::10, 0],
-                    s=4, alpha=0.5, label="IMU (orig)", ax=axes[1])
-    sns.scatterplot(x=synced_rel, y=synced["accel_aligned"][:, 0],
-                    s=4, alpha=0.5, label="Aligned", ax=axes[1])
+    sns.scatterplot(x=imu_rel[::10], y=imu_data["accel"][::10, 0], s=4, alpha=0.5, label="IMU (orig)", ax=axes[1])
+    sns.scatterplot(x=synced_rel, y=synced["accel_aligned"][:, 0], s=4, alpha=0.5, label="Aligned", ax=axes[1])
     axes[1].set_title("Accel X: Before vs Aligned")
     axes[1].set_xlabel("Time (s)")
 

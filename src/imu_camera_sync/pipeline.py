@@ -10,8 +10,8 @@ import numpy as np
 from . import cleaner, loader, synchronizer
 
 # ── thresholds ───────────────────────────────────────────────────────────────
-_GAP_MULTIPLIER = 1.5           # interval > expected * this → dropped-frame gap
-_GOOD_ALIGNMENT_MS = 5.0        # alignment error below this is considered "good"
+_GAP_MULTIPLIER = 1.5  # interval > expected * this → dropped-frame gap
+_GOOD_ALIGNMENT_MS = 5.0  # alignment error below this is considered "good"
 
 
 def process_session(
@@ -72,14 +72,10 @@ def process_session(
         # ── clean & align ──
         imu_clean = cleaner.clean_imu(imu_raw)
         camera_clean = cleaner.clean_camera(camera_raw)
-        synced = synchronizer.align(
-            imu_clean, camera_clean, method=method, max_tolerance_s=max_tolerance_s
-        )
+        synced = synchronizer.align(imu_clean, camera_clean, method=method, max_tolerance_s=max_tolerance_s)
 
         # ── alignment stats ──
-        result["alignment"] = _stats_alignment(
-            synced, imu_clean, camera_clean, method
-        )
+        result["alignment"] = _stats_alignment(synced, imu_clean, camera_clean, method)
 
         # ── visualization ──
         if with_visualization:
@@ -116,15 +112,16 @@ def batch_process(
         if not (entry / "imu.csv").exists():
             continue
 
-        res = process_session(str(entry), method=method,
-                              with_visualization=with_visualization,
-                              max_tolerance_s=max_tolerance_s)
+        res = process_session(
+            str(entry), method=method, with_visualization=with_visualization, max_tolerance_s=max_tolerance_s
+        )
         results.append(res)
 
     return results
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
+
 
 def _stats_imu(data: dict, intervals_ms: np.ndarray) -> dict:
     return {
@@ -135,9 +132,7 @@ def _stats_imu(data: dict, intervals_ms: np.ndarray) -> dict:
     }
 
 
-def _stats_alignment(
-    synced: dict, imu: dict, cam: dict, method: str
-) -> dict:
+def _stats_alignment(synced: dict, imu: dict, cam: dict, method: str) -> dict:
     idx = synced.get("imu_indices")
     if idx is not None:
         deltas_ms = np.abs(imu["timestamps"][idx] - synced["timestamps"]) * 1000
@@ -147,8 +142,7 @@ def _stats_alignment(
         error_p99 = float(np.percentile(deltas_ms, 99))
         pct_under_5ms = float(np.mean(deltas_ms < _GOOD_ALIGNMENT_MS) * 100)
         boundary_frames = int(
-            np.sum(cam["timestamps"] < imu["timestamps"][0])
-            + np.sum(cam["timestamps"] > imu["timestamps"][-1])
+            np.sum(cam["timestamps"] < imu["timestamps"][0]) + np.sum(cam["timestamps"] > imu["timestamps"][-1])
         )
         imu_coverage_pct = float(len(np.unique(idx)) / len(imu["timestamps"]) * 100)
     else:
